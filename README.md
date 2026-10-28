@@ -446,3 +446,173 @@ A skill deve atingir os seguintes mínimos em **todos os 3 projetos**:
 - **Projetos diferentes exigem adaptação** — a Fase 3 de um projeto já parcialmente organizado não vai ter as mesmas transformações de um monolito. Sua skill deve se adaptar ao contexto.
 - **Pedir confirmação na Fase 2 é obrigatório** — o humano deve revisar o relatório antes de qualquer modificação.
 - **Consulte as referências do curso** — revise a documentação oficial da ferramenta escolhida e os materiais das aulas para relembrar a estrutura e anatomia de uma skill.
+
+## A) ANALISE MANUAL LAÍSA
+Projeto: code-smells-project
+
+Encontrei os seguintes problemas analisando esse projeto
+
+1) CRITICAL
+1.0) SQL INJECTION = O Controller chama funções do models.py, e essas funções montam SQL concatenando valores recebidos da requisição.
+
+2) MEDIUM
+2.1) Validações espalhadas entre controller e model, regras de negocio devem estar no service
+2.2) Fortemente Acoplado = Controller depende diretamente das funções do model, pensando que a aplicação irá crescer isso não é uma boa pratica, dificil substituir dependencias se precisar
+
+3) LOW
+3.1) Importação de sqlite3, mas nao é usado esse tipo de banco de dados, gerando código lixo e carregamento desnecssario
+3.2) Parametro com nomes génericos, como "ID" que não ajudam na manutenção do código
+
+Projeto: ecommerce-api-legacy
+
+Encontrei os seguintes problemas analisando esse projeto
+
+1) HIGH
+1.0) Regras de negócios implementados direto na rota como em /api/checkout
+
+2) MEDIUM
+2.1) Relatório financeiro usando uma consulta para cada registro  obtido da consulta princial
+2.2) Usar banco em memória em vez de persistencia real de dados
+
+3) LOW
+3.1) Variaveis criadas mas não usadas
+3.2) Valores fixos no codigo
+
+Projeto: task-manager-api
+
+Encontrei os seguintes problemas analisando esse projeto
+
+1) HIGH
+1.0) task_routes.py está funcionando como Controller + Service + parte da camada de acesso a dados.
+
+2) MEDIUM
+2.1) n+1 query para buscar task
+2.2) Duplicação de logica
+
+3) LOW
+3.1) importando pacotes que nao sao utilizados, como json
+3.2) Valores fixos espalhados no codigo
+
+## B) Seção "Construção da Skill":
+
+Eu estruturei a Skill em três fases: análise, auditoria e refatoração. O SKILL.md funciona como orquestrador e os arquivos de referência concentram o conhecimento específico de análise, anti-patterns, relatório, MVC e refatoração.
+
+No catálogo incluí problemas de arquitetura, SOLID, segurança e performance, como God Class, Fat Controller, Tight Coupling, N+1, APIs deprecated, hardcoded secrets e SQL Injection, classificados em CRITICAL, HIGH, MEDIUM e LOW.
+
+Para garantir que ela seja agnóstica de tecnologia, a Skill primeiro detecta a stack e a arquitetura através dos arquivos e estruturas do projeto. Depois aplica princípios arquiteturais, em vez de assumir uma estrutura específica. Por exemplo, uma API pode ter Controller, Service e Repository sem necessariamente possuir uma View tradicional.
+
+O principal cuidado foi separar diagnóstico de alteração. Na Fase 2 a Skill gera o relatório e obrigatoriamente para para pedir confirmação. Só depois executa a Fase 3. Por fim, ela valida build, testes, boot e endpoints e faz uma nova auditoria para verificar o resultado da refatoração.
+
+
+## C) Seção "Resultados":
+
+Resumo dos relatórios de auditoria dos 3 projetos (quantos findings por severidade em cada)
+Comparação antes/depois da estrutura de cada projeto
+Checklist de validação preenchido para cada projeto
+Screenshots ou logs mostrando as aplicações rodando após refatoração
+Observações sobre como a skill se comportou em stacks diferentes
+
+CHECKLIST DE VALIDAÇÃO 
+
+1) **code-smells-project**
+## Checklist de Validação
+
+### Fase 1 — Análise
+- [x] Linguagem detectada corretamente
+- [x] Framework detectado corretamente
+- [x] Domínio da aplicação descrito corretamente
+- [x] Número de arquivos analisados condiz com a realidade
+
+### Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados
+- [x] Detecção de APIs deprecated incluída (se aplicável)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+### Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente
+
+2) **ecommerce-api-legacy**
+## Checklist de Validação
+
+### Fase 1 — Análise
+- [x] Linguagem detectada corretamente
+- [x] Framework detectado corretamente
+- [x] Domínio da aplicação descrito corretamente
+- [x] Número de arquivos analisados condiz com a realidade
+
+### Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados
+- [x] Detecção de APIs deprecated incluída (se aplicável)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+### Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente
+
+
+2) **task-manager-api**
+## Checklist de Validação
+
+### Fase 1 — Análise
+- [x] Linguagem detectada corretamente
+- [x] Framework detectado corretamente
+- [x] Domínio da aplicação descrito corretamente
+- [x] Número de arquivos analisados condiz com a realidade
+
+### Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados
+- [x] Detecção de APIs deprecated incluída (se aplicável)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+### Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente
+
+## D) Seção "Como Executar":
+
+1) Intalar o cursor de acordo com seu sistema operacional
+2) Abra um chat para cada projeto e digite: 
+
+"Siga a skill @code-smells-project/.cursor/skills/refactor-arch/SKILL.md
+
+Alvo exclusivo: @code-smells-project/
+
+Execute só FASE 1 (análise)"
+
+Depois execute o comando:
+Execute a fase 2
+
+Após a execução da fase 2 é perguntado se deseja executar a fase 3 de refatoração: responder SIM ou y
+
+Para validar que refatoração funcionou as aplicações precisam estar compilando e executando sem erro

@@ -1,116 +1,87 @@
-from datetime import datetime
-import re
-import os
-import json
-import sys
-import math
-import hashlib
+﻿"""Constantes de domínio e utilidades compartilhadas.
 
-def format_date(date_obj):
-    if date_obj:
-        return str(date_obj)
-    return None
+Substitui o antigo `utils/helpers.py`, que acumulava funções duplicadas e órfãs
+(FINDING-021) e não era usado pelas rotas.
+"""
+from datetime import datetime, timedelta, timezone
+
+# Status de task (antes repetidos como literais em 5 arquivos).
+STATUS_PENDING = 'pending'
+STATUS_IN_PROGRESS = 'in_progress'
+STATUS_DONE = 'done'
+STATUS_CANCELLED = 'cancelled'
+
+TERMINAL_STATUSES = (STATUS_DONE, STATUS_CANCELLED)
+
+VALID_STATUSES = [STATUS_PENDING, STATUS_IN_PROGRESS, STATUS_DONE, STATUS_CANCELLED]
+
+ROLE_USER = 'user'
+ROLE_ADMIN = 'admin'
+ROLE_MANAGER = 'manager'
+VALID_ROLES = [ROLE_USER, ROLE_ADMIN, ROLE_MANAGER]
+
+MIN_TITLE_LENGTH = 3
+MAX_TITLE_LENGTH = 200
+MIN_PASSWORD_LENGTH = 4
+MAX_TAGS_LENGTH = 500
+
+MIN_PRIORITY = 1
+MAX_PRIORITY = 5
+DEFAULT_PRIORITY = 3
+
+# Faixas de prioridade usadas pelos relatórios (magic numbers → constantes).
+PRIORITY_LABELS = {1: 'critical', 2: 'high', 3: 'medium', 4: 'low', 5: 'minimal'}
+HIGH_PRIORITY_THRESHOLD = 2
+
+DEFAULT_COLOR = '#000000'
+COLOR_LENGTH = 7
+DEFAULT_DESCRIPTION = ''
+
+EMAIL_PATTERN = r'^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$'
+DATE_FORMAT = '%Y-%m-%d'
+RECENT_ACTIVITY_WINDOW_DAYS = 7
+
+
+def utcnow():
+    """UTC atual.
+
+    Retorna **naive** (UTC) para ser comparável às colunas `DateTime` já
+    existentes no banco. Evita o `datetime.utcnow()` depreciado sem introduzir
+    o erro "can't compare offset-naive and offset-aware datetimes".
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def to_naive_utc(moment):
+    """Normaliza datetimes aware para naive-UTC (compatível com as colunas atuais)."""
+    if moment is None:
+        return None
+    if moment.tzinfo is not None:
+        return moment.astimezone(timezone.utc).replace(tzinfo=None)
+    return moment
+
+
+def iso_utc(moment):
+    """Formata um datetime naive-UTC como ISO-8601 com sufixo Z."""
+    if moment is None:
+        return None
+    return to_naive_utc(moment).isoformat() + 'Z'
+
+
+def parse_date(date_string, fmt=DATE_FORMAT):
+    """Converte string em datetime naive; retorna None se inválida."""
+    try:
+        return datetime.strptime(date_string, fmt)
+    except (TypeError, ValueError):
+        return None
+
 
 def calculate_percentage(part, total):
-    if total == 0:
+    if not total:
         return 0
     return round((part / total) * 100, 2)
 
-def validate_email(email):
 
-    if re.match(r'^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$', email):
-        return True
-    return False
+def recent_activity_cutoff():
+    return to_naive_utc(utcnow() - timedelta(days=RECENT_ACTIVITY_WINDOW_DAYS))
 
-def sanitize_string(s):
-
-    if s:
-        return s.strip()
-    return s
-
-def generate_id():
-
-    import uuid
-    return str(uuid.uuid4())
-
-def log_action(action, details=None):
-
-    timestamp = datetime.utcnow()
-    print(f"[{timestamp}] ACTION: {action}")
-    if details:
-        print(f"  DETAILS: {details}")
-
-def parse_date(date_string):
-    try:
-        return datetime.strptime(date_string, '%Y-%m-%d')
-    except:
-        try:
-            return datetime.strptime(date_string, '%d/%m/%Y')
-        except:
-            return None
-
-def is_valid_color(color):
-    if color and len(color) == 7 and color[0] == '#':
-        return True
-    return False
-
-def process_task_data(data, existing_task=None):
-    result = {}
-
-    if 'title' in data:
-        title = data['title']
-        if title:
-            title = title.strip()
-            if len(title) >= 3 and len(title) <= 200:
-                result['title'] = title
-            else:
-                return None, 'Título deve ter entre 3 e 200 caracteres'
-        else:
-            return None, 'Título não pode ser vazio'
-
-    if 'description' in data:
-        result['description'] = data['description']
-
-    if 'status' in data:
-        valid_statuses = ['pending', 'in_progress', 'done', 'cancelled']
-        if data['status'] in valid_statuses:
-            result['status'] = data['status']
-        else:
-            return None, 'Status inválido'
-
-    if 'priority' in data:
-        try:
-            p = int(data['priority'])
-            if p >= 1 and p <= 5:
-                result['priority'] = p
-            else:
-                return None, 'Prioridade deve ser entre 1 e 5'
-        except:
-            return None, 'Prioridade inválida'
-
-    if 'due_date' in data:
-        if data['due_date']:
-            parsed = parse_date(data['due_date'])
-            if parsed:
-                result['due_date'] = parsed
-            else:
-                return None, 'Data inválida'
-        else:
-            result['due_date'] = None
-
-    if 'tags' in data:
-        tags = data['tags']
-        if type(tags) == list:
-            result['tags'] = ','.join(tags)
-        else:
-            result['tags'] = tags
-
-    return result, None
-
-VALID_STATUSES = ['pending', 'in_progress', 'done', 'cancelled']
-VALID_ROLES = ['user', 'admin', 'manager']
-MAX_TITLE_LENGTH = 200
-MIN_TITLE_LENGTH = 3
-MIN_PASSWORD_LENGTH = 4
-DEFAULT_PRIORITY = 3
-DEFAULT_COLOR = '#000000'

@@ -1,1 +1,3 @@
+"""Camada de utilitarios compartilhados."""
+
 

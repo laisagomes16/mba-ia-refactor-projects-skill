@@ -1,4 +1,5 @@
 @baseUrl = http://localhost:3000
+@adminKey = admin-secret
 
 ### Checkout - sucesso
 POST {{baseUrl}}/api/checkout
@@ -26,6 +27,11 @@ Content-Type: application/json
 
 ### Relatório financeiro administrativo
 GET {{baseUrl}}/api/admin/financial-report
+x-admin-key: {{adminKey}}
+
+### Relatório financeiro - sem auth (deve 401)
+GET {{baseUrl}}/api/admin/financial-report
 
 ### Deletar usuário
 DELETE {{baseUrl}}/api/users/1
+x-admin-key: {{adminKey}}
