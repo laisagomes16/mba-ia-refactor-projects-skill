@@ -58,3 +58,16 @@ class AuthService:
         if payload.get('exp', 0) < int(time.time()):
             raise AuthenticationError(MSG_INVALID_TOKEN)
         return payload
+
+    @staticmethod
+    def user_from_payload(payload):
+        """Resolve o `User` a partir do `sub` de um payload já validado.
+
+        Import local evita ciclo (`repositories` → `models` → `utils`).
+        """
+        from repositories.user_repository import UserRepository
+
+        subject = (payload or {}).get('sub')
+        if subject is None:
+            return None
+        return UserRepository.get_by_id(subject)

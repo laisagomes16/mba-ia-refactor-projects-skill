@@ -28,6 +28,28 @@ segredo fica no código-fonte.
 | `FLASK_DEBUG` | `false` | Modo debug (nunca em produção) |
 | `SMTP_*` | — | Opcionais; sem eles o envio de e-mail é apenas registrado em log |
 
+## Autenticação e autorização
+
+`POST /login` devolve um token HMAC assinado (`services/auth_service.py`). Envie-o em
+todas as rotas protegidas:
+
+```http
+Authorization: Bearer <token>
+```
+
+Política aplicada pelo `middleware/auth.py`:
+
+| Rota | Acesso |
+|---|---|
+| `GET /`, `GET /health`, `POST /login` | público |
+| `GET /users*`, `GET /tasks*`, `GET /categories`, `GET /reports/*` | autenticado |
+| `POST/PUT/DELETE /tasks` | autenticado |
+| `PUT/DELETE /users/<id>` | o próprio usuário **ou** admin |
+| `POST /users`, `POST/PUT/DELETE /categories` | admin |
+
+Sem token válido → **401**; sem permissão → **403**; token adulterado/expirado → **401**.
+O usuário autenticado fica disponível em `g.current_user`.
+
 ## Arquitetura
 
 ```text
@@ -35,6 +57,7 @@ app.py                  app factory (create_app) + rotas / e /health
 config.py               configuração por ambiente (sem segredos)
 errors.py               exceções de domínio
 error_handlers.py       mapeamento central de erro → HTTP JSON
+middleware/auth.py      autenticação/autorização na borda (decorators)
 serializers.py          formato JSON público (única fonte)
 routes/                  controllers finos (só HTTP)
 services/                regras de negócio (sem HTTP, sem SQL)
@@ -54,4 +77,8 @@ traduzidos para HTTP pelo handler central.
   primeiro login bem-sucedido.
 - `POST /login` continua devolvendo `token`; o valor agora é um token HMAC assinado e
   validável (`services/auth_service.py`) em vez de `fake-jwt-token-<id>`.
+- **Mudança intencional (FINDING-008):** as rotas protegidas agora exigem
+  `Authorization: Bearer <token>`. Antes, todas as 22 rotas eram públicas — inclusive
+  `DELETE /users/<id>`, que apagava o usuário e todas as suas tasks sem credencial.
+  Clientes que chamavam a API sem token passam a receber **401**.
 
