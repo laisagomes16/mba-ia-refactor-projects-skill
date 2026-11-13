@@ -25,8 +25,22 @@ class UserService:
         return user
 
     @staticmethod
-    def list_all():
-        return UserRepository.list_all()
+    def list_all(pagination=None):
+        if pagination is None:
+            return UserRepository.list_all()
+        return UserRepository.list_all(limit=pagination['per_page'],
+                                       offset=pagination['offset'])
+
+    @staticmethod
+    def count(pagination):
+        if pagination is None:
+            return None
+        return UserRepository.count_all()
+
+    @staticmethod
+    def task_counts():
+        """Mapa `user_id -> total de tasks` em uma única query (FINDING-013)."""
+        return UserRepository.task_counts_by_user()
 
     # ----- validação -----
 

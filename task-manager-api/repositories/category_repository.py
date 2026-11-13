@@ -15,13 +15,16 @@ class CategoryRepository:
         return Category.query.filter(Category.name == name).first()
 
     @staticmethod
-    def list_all_with_tasks():
+    def list_all_with_tasks(limit=None, offset=None):
         # joinedload evita N+1 no contador de tasks por categoria (FINDING-012).
-        return Category.query.options(joinedload(Category.tasks)).all()
+        query = Category.query.options(joinedload(Category.tasks))
+        if limit is not None:
+            query = query.limit(limit).offset(offset or 0)
+        return query.all()
 
     @staticmethod
     def count_all():
-        return Category.query.count()
+        return db.session.scalar(db.select(db.func.count(Category.id)))
 
     @staticmethod
     def save(category):

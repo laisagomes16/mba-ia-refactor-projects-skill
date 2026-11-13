@@ -13,17 +13,22 @@ Defina as variáveis de ambiente (veja `.env.example`). Segredos **não** ficam 
 Exemplo (PowerShell):
 
 ```powershell
-$env:DB_USER="admin"
-$env:DB_PASS="change-me"
 $env:PAYMENT_GATEWAY_KEY="pk_test_change_me"
-$env:SMTP_USER="no-reply@example.com"
 $env:ADMIN_API_KEY="admin-secret"
+$env:SEED_USER_PASSWORD="change-me-please"
 $env:PORT="3000"
-$env:SEED_USER_PASSWORD="123"
 npm start
 ```
 
-A aplicação sobe em `http://localhost:3000`. O banco SQLite é em memória e carrega seeds no boot (senha do usuário seed = `SEED_USER_PASSWORD`).
+Variáveis obrigatórias: `PAYMENT_GATEWAY_KEY`, `ADMIN_API_KEY` e `SEED_USER_PASSWORD` (mínimo de 8 caracteres). O boot falha com mensagem explícita se alguma estiver ausente ou inválida. O banco é SQLite em memória, portanto `DB_USER`/`DB_PASS`/`SMTP_USER` não são necessários.
+
+A aplicação sobe em `http://localhost:3000`. O banco SQLite é em memória e carrega seeds no boot (senha do usuário seed = `SEED_USER_PASSWORD`, armazenada com hash scrypt).
+
+## Testes
+
+```bash
+npm test
+```
 
 ## Autenticação admin
 

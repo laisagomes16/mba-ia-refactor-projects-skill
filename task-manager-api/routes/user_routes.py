@@ -5,6 +5,7 @@ from middleware.auth import require_auth, require_admin, require_self_or_admin
 from serializers import serialize_task_summary, serialize_user, serialize_user_summary
 from services.task_service import TaskService
 from services.user_service import UserService
+from utils.helpers import paginated, parse_pagination
 
 user_bp = Blueprint('users', __name__)
 
@@ -12,12 +13,16 @@ user_bp = Blueprint('users', __name__)
 @user_bp.route('/users', methods=['GET'])
 @require_auth
 def list_users():
-    users = UserService.list_all()
+    pagination = parse_pagination(request.args)
+    users = UserService.list_all(pagination)
+    task_counts = UserService.task_counts()
     result = []
     for user in users:
         data = serialize_user_summary(user)
-        data['task_count'] = len(user.tasks)
+        data['task_count'] = task_counts.get(user.id, 0)
         result.append(data)
+    if pagination is not None:
+        return jsonify(paginated(result, UserService.count(pagination), pagination)), 200
     return jsonify(result), 200
 
 
@@ -52,8 +57,13 @@ def delete_user(user_id):
 @user_bp.route('/users/<int:user_id>/tasks', methods=['GET'])
 @require_auth
 def get_user_tasks(user_id):
-    tasks = TaskService.list_by_user(user_id)
-    return jsonify([serialize_task_summary(task) for task in tasks]), 200
+    pagination = parse_pagination(request.args)
+    tasks = TaskService.list_by_user(user_id, pagination)
+    result = [serialize_task_summary(task) for task in tasks]
+    if pagination is not None:
+        total = TaskService.count(pagination, {'user_id': user_id})
+        return jsonify(paginated(result, total, pagination)), 200
+    return jsonify(result), 200
 
 
 @user_bp.route('/login', methods=['POST'])

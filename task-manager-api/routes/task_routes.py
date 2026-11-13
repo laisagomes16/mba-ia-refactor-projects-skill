@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from middleware.auth import require_auth
 from serializers import serialize_task, serialize_task_with_relations
 from services.task_service import TaskService
+from utils.helpers import paginated, parse_pagination
 
 task_bp = Blueprint('tasks', __name__)
 
@@ -11,8 +12,12 @@ task_bp = Blueprint('tasks', __name__)
 @task_bp.route('/tasks', methods=['GET'])
 @require_auth
 def list_tasks():
-    tasks = TaskService.list_all()
-    return jsonify([serialize_task_with_relations(task) for task in tasks]), 200
+    pagination = parse_pagination(request.args)
+    tasks = TaskService.list_all(pagination)
+    result = [serialize_task_with_relations(task) for task in tasks]
+    if pagination is not None:
+        return jsonify(paginated(result, TaskService.count(pagination), pagination)), 200
+    return jsonify(result), 200
 
 
 @task_bp.route('/tasks/<int:task_id>', methods=['GET'])
@@ -46,8 +51,13 @@ def delete_task(task_id):
 @task_bp.route('/tasks/search', methods=['GET'])
 @require_auth
 def search_tasks():
-    tasks = TaskService.search(request.args)
-    return jsonify([serialize_task(task) for task in tasks]), 200
+    pagination = parse_pagination(request.args)
+    tasks = TaskService.search(request.args, pagination)
+    result = [serialize_task(task) for task in tasks]
+    if pagination is not None:
+        total = TaskService.count(pagination, {'q': request.args.get('q')})
+        return jsonify(paginated(result, total, pagination)), 200
+    return jsonify(result), 200
 
 
 @task_bp.route('/tasks/stats', methods=['GET'])

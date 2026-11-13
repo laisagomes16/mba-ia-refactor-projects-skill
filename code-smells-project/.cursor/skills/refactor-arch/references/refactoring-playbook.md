@@ -643,6 +643,77 @@ Unauthorized request gets 401/403 as appropriate; authorized path unchanged.
 
 ---
 
+### ⚠️ `@require_auth` alone is NOT sufficient for resource mutations
+
+Authentication answers *who are you*. Authorization answers *may you do this*. Applying the
+`After` snippet above to every endpoint closes FINDING-level "no authn" but **leaves privilege
+escalation open**, because any self-registered account becomes a valid identity:
+
+```text
+POST /usuarios  (public self-registration, standard for a storefront)
+  → creates a "cliente"-level account
+  → POST /login → valid token
+  → DELETE /produtos/<id>   ← guarded only by @require_auth
+  → catalogue erased by an anonymous visitor
+```
+
+The audit still says `apagar catálogo`. That impact is **not resolved** — the refactor merely
+replaced "no credential" with "any credential". Verify the impact sentence, not the decorator.
+
+#### Required shape for every mutation
+
+Classify **each mutating route** by *who legitimately owns the decision* and guard it explicitly.
+`@require_auth` is the floor, never the ceiling:
+
+| Route kind | Guard | Rationale |
+|---|---|---|
+| Destructive/shared resource (`DELETE /produtos/<id>`, `PUT /produtos/<id>`) | `@require_role(admin)` | A customer deleting the catalogue is never a legitimate flow |
+| Read of any/all sensitive records (`GET /usuarios`, `GET /pedidos`) | `@require_role(admin)` | Cross-tenant data |
+| Read/write of *own* records (`GET /pedidos/usuario/<id>`, order status by its owner) | `@require_auth` + owner check (`id == current_user.id`) | IDOR |
+| Order lifecycle transitions (`PUT /pedidos/<id>/status`) | `@require_role(admin)` **or** owner-only transitions, stated explicitly | Business rule, must be written down |
+| Self-registration (`POST /usuarios`) | public, and **must not** accept a privilege field (`tipo`, `role`) from the body | Otherwise the public endpoint mints admins and every role check is theatre |
+| Admin surface (`/admin/*`) | `@require_role(admin)` + strong auth | Never "SQL livre" |
+
+Rules that make this auditable:
+
+1. **Mutations default to privileged.** If you cannot name who is allowed to call a mutation,
+   the answer is `admin`, not "any authenticated user".
+2. **A public endpoint that issues identities must be privilege-pinned.** Check the service:
+   the role must be assigned server-side (e.g. `tipo="cliente"` hardcoded), never read from the
+   request body. Also confirm the response has no privilege field the client can then resend.
+3. **Role must come from persisted state, not from the token claim alone** when roles can change
+   (reload the user row and read the current role). A token minted before a demotion must not
+   keep admin rights.
+4. **Deny by default in the framework, allow by exception.** If the stack supports it, install a
+   global check that rejects unlisted routes (or assert at startup that every rule is guarded);
+   a forgotten decorator is a silent vulnerability, not a failing test.
+5. **Never trust a client-supplied role or owner id** for the authorization decision itself.
+
+#### Self-registration closure test (mandatory for this transformation)
+
+The exploit path is the acceptance test. It needs no privileged credentials:
+
+```text
+1. Anonymously POST the public registration endpoint with an unprivileged body.
+2. Log in as that fresh account → token.
+3. Attempt every mutating route identified in the audit's Impact sentence.
+   Expected: 403 (not 200, not 401).
+4. Repeat with a legacy account of the same low role → still 403.
+5. Repeat the same routes with the admin → succeeds (authorized path unchanged).
+```
+
+If step 3 returns 200 for a mutation named in a CRITICAL/HIGH Impact, the finding is
+**NOT RESOLVED** even when every route technically has `@require_auth`.
+
+#### Validation
+
+- Swap one credential at a time: no token → 401; low-role token → 403; admin → 200.
+- Re-read the finding's **Impact** line and tick each clause with a concrete request/response.
+- A mutation guarded only by authentication is reported as `PARTIALLY RESOLVED`, with the
+  escalation path written out.
+
+---
+
 ## Phase 3 validation checklist
 
 Detect commands from the real project; never run incompatible tools.
@@ -653,8 +724,13 @@ Detect commands from the real project; never run incompatible tools.
 | Tests | Run existing suite | `No automated tests detected.` |
 | Boot | Start with the real entry command | `NOT VALIDATED` + reason |
 | Endpoints | Discover from routes; exercise relevant ones | `NOT VALIDATED` + reason |
+| Impact verification | One executed check per Impact clause of every CRITICAL/HIGH finding | `NOT VALIDATED` + reason; the finding stays `Remaining` |
+| Privilege matrix | Each mutation as anonymous / fresh low-privilege / admin | `NOT VALIDATED` + reason |
 | Re-audit | Recount severities BEFORE/AFTER | Required |
 
 Never claim an endpoint works without testing it.
+
+Never write `Resolved` for a CRITICAL/HIGH whose `Impact` line was not exercised clause by
+clause. "The recommended fix is present in the diff" is not a verification.
 
 Report remaining findings and why they stayed (optional quality, out of scope, tech limits). Then emit the Phase 3 completion block from `SKILL.md`.

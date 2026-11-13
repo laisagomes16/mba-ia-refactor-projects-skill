@@ -207,6 +207,62 @@ Refactoring is not complete when files change. Validate with **compatible** comm
 
 After changes, re-audit. Compare BEFORE vs AFTER counts for CRITICAL/HIGH/MEDIUM/LOW. Report `Resolved`, `Remaining`, `New`. Check that refactoring did not introduce new problems.
 
+### Impact verification for CRITICAL/HIGH (mandatory, before writing "Resolved")
+
+A finding is closed by the **reported Impact disappearing**, not by the recommended fix's
+surface change. A decorator, a renamed file, or "the code now has layer X" is not evidence.
+
+For **each** CRITICAL and HIGH finding, in order:
+
+1. **Re-read its `Impact:` line verbatim** from the Phase 2 report.
+2. **Decompose it into testable clauses.** `Roubo de contas, apagar catálogo, resetar o banco, alterar pedidos de qualquer usuário` is *four* separate claims, and each needs its own check.
+3. **Write one concrete check per clause**, using only real routes/handlers. Privilege-related clauses must be exercised with *every* role a real attacker can obtain.
+4. **Execute** via the validation step (endpoints / boot / code inspection when no runtime is possible).
+5. **Classify the finding:**
+
+| Outcome | Meaning |
+|---|---|
+| `RESOLVED` | Every Impact clause verified as no longer reachable |
+| `PARTIALLY RESOLVED` | Some clauses hold; at least one is still reachable |
+| `NOT RESOLVED` | The Impact is still reachable through any path |
+
+6. **Escalation audit:** for any finding whose Impact mentions data modification, destruction,
+   privilege, or account access, enumerate **every route that can create or upgrade an
+   identity**, and confirm whether that identity reaches the sensitive operations. A public
+   signup plus a low-privilege token that can still mutate shared resources is an unresolved
+   finding, no matter how many decorators are present.
+
+Rules:
+
+- `Resolved: N CRITICAL` counts **only** `RESOLVED`. `PARTIALLY RESOLVED` and `NOT RESOLVED` go
+  in `Remaining`, with the surviving clause named explicitly.
+- Never report a finding as resolved because the *recommended fix* was applied literally. If the
+  playbook transformation is insufficient for the Impact (e.g. Transformation 14 with only
+  authentication on mutations), say so and go further.
+- If an Impact clause cannot be tested in this environment: `NOT VALIDATED` + the reason, and
+  count the finding as `Remaining`. Do not optimistically close it.
+- If the audit's own Impact is broader than the code's real exposure, do not silently shrink it:
+  verify what you can, and state which clause was overstated and why.
+
+Emit the verification table before the Phase 3 output:
+
+```text
+## Impact Verification (CRITICAL/HIGH)
+
+| Finding | Impact clause | Check performed | Result |
+|---------|---------------|-----------------|--------|
+| FINDING-004 | apagar catálogo | POST /usuarios (anônimo) → login → DELETE /produtos/1 | 200 → NOT RESOLVED |
+| FINDING-004 | alterar pedidos de qualquer usuário | cliente A → PUT /pedidos/1/status (de B) | 403 → RESOLVED |
+```
+
+### Insecure control (refactoring must not reintroduce the finding)
+
+Before considering a refactor finished, re-run the exploit shape from the audit against the new
+code. A refactor that replaces "no authentication" with "any authentication" changes the
+exploit's cost, not its existence. Whenever the Impact names privilege, destruction, or
+sensitive data, the acceptance test must include a **fresh low-privilege identity**
+(self-registered when the app allows it), not only an admin token.
+
 ### Phase 3 output
 
 ```text
@@ -216,14 +272,14 @@ PHASE 3: REFACTORING COMPLETE
 
 ## Refactoring Summary
 
-Resolved:
+Resolved:            (only findings whose every Impact clause was verified)
 - X CRITICAL
 - X HIGH
 - X MEDIUM
 - X LOW
 
 Remaining:
-- X CRITICAL
+- X CRITICAL  (list each as PARTIALLY RESOLVED / NOT RESOLVED / NOT VALIDATED + surviving clause)
 - X HIGH
 - X MEDIUM
 - X LOW
@@ -284,3 +340,9 @@ Phase 3 requires an explicit affirmative answer after the Phase 2 report. Implic
 - Use only stack-compatible commands.
 - Do not claim PASS without having run or attempted the check.
 - Use `NOT VALIDATED` with a reason when a check cannot be performed.
+- `Security: PASS` requires the Impact Verification table to show every CRITICAL/HIGH clause as
+  `RESOLVED`. Any `NOT RESOLVED` clause makes it `FAIL`, and any `NOT VALIDATED` clause makes it
+  `NOT VALIDATED` — never `PASS`.
+- Authorization checks are done with at least three identities: none (expect 401), fresh
+  low-privileged (expect 403 on privileged operations), admin (expect success). A route that
+  answers 200 to the low-privileged identity is a finding, not a fixture.

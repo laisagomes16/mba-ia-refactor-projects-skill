@@ -24,7 +24,7 @@ segredo fica no código-fonte.
 |---|---|---|
 | `FLASK_SECRET_KEY` | aleatório por processo | Assina os tokens de autenticação |
 | `TASK_MANAGER_DATABASE_URI` | `sqlite:///tasks.db` | Conexão do banco |
-| `TASK_MANAGER_HOST` / `TASK_MANAGER_PORT` | `0.0.0.0` / `5000` | Bind do servidor |
+| `TASK_MANAGER_HOST` / `TASK_MANAGER_PORT` | `127.0.0.1` / `5000` | Bind do servidor (loopback por padrão) |
 | `FLASK_DEBUG` | `false` | Modo debug (nunca em produção) |
 | `SMTP_*` | — | Opcionais; sem eles o envio de e-mail é apenas registrado em log |
 
@@ -68,6 +68,52 @@ utils/helpers.py         constantes e utilitários compartilhados
 
 Fluxo de uma requisição: `route → service → repository → model`, com erros de domínio
 traduzidos para HTTP pelo handler central.
+
+## Notificações
+
+`services/notification_service.py` é chamado por `TaskService` sempre que uma task é
+(atribuída|reatribuída) a um usuário — na criação (`POST /tasks` com `user_id`) e quando
+o `user_id` muda em `PUT /tasks/<id>`. Renomear a task não notifica.
+
+O envio é **best-effort**: sem `SMTP_USER`/`SMTP_PASSWORD` no ambiente nada é enviado,
+apenas um `warning` é logado, e a requisição responde normalmente. Para trocar o
+notificador (ex.: em testes) use `TaskService.set_notifier(...)`.
+
+## Testes
+
+```bash
+python -m pytest test -q
+```
+
+Os testes usam banco SQLite em memória e cobrem as regressões da auditoria
+(`test/test_audit_findings.py`): contagem de tasks por usuário sem N+1, relatório
+agregado em SQL, bind padrão em loopback e notificação de atribuição.
+
+## Paginação (opcional)
+
+Os endpoints de listagem aceitam `page` e `per_page` na query string:
+
+| Endpoint | Observação |
+|---|---|
+| `GET /tasks` | lista de tasks (com `user_name`/`category_name`) |
+| `GET /tasks/search` | combina com `q`, `status`, `user_id`, `priority`, `category_id` |
+| `GET /users` | inclui `task_count` |
+| `GET /users/<id>/tasks` | tasks do usuário |
+| `GET /categories` | inclui `task_count` |
+
+- **Sem os parâmetros a resposta continua sendo um array** — o contrato original é preservado.
+- Com `?page=` e/ou `?per_page=` a resposta vira `{items, page, per_page, total, pages}`.
+  Defaults: `page=1`, `per_page=20` (máximo `100`).
+- Valores inválidos (`page=0`, `per_page=abc`, `per_page=101`) retornam **400**.
+
+```http
+GET /tasks?page=2&per_page=10
+Authorization: Bearer <token>
+```
+
+```json
+{"items": [], "page": 2, "per_page": 10, "total": 42, "pages": 5}
+```
 
 ## Compatibilidade
 

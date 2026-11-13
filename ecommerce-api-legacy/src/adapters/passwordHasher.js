@@ -15,12 +15,9 @@ function createPasswordHasher() {
         async verify(password, stored) {
             if (!stored || typeof stored !== 'string') return false;
 
-            if (!stored.startsWith('scrypt$')) {
-                return stored === password;
-            }
-
+            // Only scrypt hashes are accepted; there is no plaintext fallback.
             const parts = stored.split('$');
-            if (parts.length !== 3) return false;
+            if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
 
             const [, salt, hashHex] = parts;
             const derived = await scrypt(password, salt, KEY_LENGTH);

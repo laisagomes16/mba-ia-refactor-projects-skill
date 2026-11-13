@@ -4,6 +4,7 @@ from models.task import Task
 from repositories.category_repository import CategoryRepository
 from repositories.task_repository import TaskRepository
 from repositories.user_repository import UserRepository
+from services.notification_service import NotificationService
 from utils.helpers import (
     DEFAULT_DESCRIPTION,
     DEFAULT_PRIORITY,
@@ -33,6 +34,23 @@ def _as_int(value):
 
 
 class TaskService:
+    # Notificador injetável (FINDING-021: antes o serviço existia mas nunca era
+    # chamado). Pode ser trocado em testes sem tocar em SMTP.
+    notifications = NotificationService
+
+    @classmethod
+    def set_notifier(cls, notifier):
+        """Permite substituir o notificador (ex.: dublê em testes)."""
+        cls.notifications = notifier
+
+    @classmethod
+    def _notify_assignment(cls, task, previous_user_id=None):
+        """Notifica o novo responsável quando a task é (re)atribuída a alguém."""
+        if task.user_id is None or task.user_id == previous_user_id:
+            return
+        user = UserRepository.get_by_id(task.user_id)
+        cls.notifications.notify_task_assigned(user, task)
+
     # ----- leitura -----
 
     @staticmethod
@@ -43,25 +61,50 @@ class TaskService:
         return task
 
     @staticmethod
-    def list_all():
-        return TaskRepository.list_all()
+    def list_all(pagination=None):
+        if pagination is None:
+            return TaskRepository.list_all()
+        return TaskRepository.list_all(limit=pagination['per_page'],
+                                       offset=pagination['offset'])
 
     @staticmethod
-    def list_by_user(user_id):
+    def count(pagination, filters=None):
+        """Total de itens para o envelope de paginação (1 query `COUNT`)."""
+        if pagination is None:
+            return None
+        filters = filters or {}
+        if filters.get('q'):
+            return TaskRepository.count_by_term(filters['q'])
+        return TaskRepository.count_filtered(
+            status=filters.get('status'),
+            user_id=filters.get('user_id'),
+            priority=filters.get('priority'),
+            category_id=filters.get('category_id'),
+        )
+
+    @staticmethod
+    def list_by_user(user_id, pagination=None):
         if not UserRepository.get_by_id(user_id):
             raise NotFoundError(MSG_USER_NOT_FOUND)
-        return TaskRepository.list_by_user(user_id)
+        if pagination is None:
+            return TaskRepository.list_by_user(user_id)
+        return TaskRepository.list_by_user(user_id, limit=pagination['per_page'],
+                                           offset=pagination['offset'])
 
     @staticmethod
-    def search(args):
+    def search(args, pagination=None):
         term = args.get('q')
+        window = {}
+        if pagination is not None:
+            window = {'limit': pagination['per_page'], 'offset': pagination['offset']}
         if term:
-            return TaskRepository.search_by_term(term)
+            return TaskRepository.search_by_term(term, **window)
         return TaskRepository.search(
             status=args.get('status'),
             user_id=_as_int(args.get('user_id')),
             priority=_as_int(args.get('priority')),
             category_id=_as_int(args.get('category_id')),
+            **window
         )
 
     # ----- validação -----
@@ -130,11 +173,14 @@ class TaskService:
         if 'tags' in payload:
             task.set_tags(payload['tags'])
 
-        return TaskRepository.save(task)
+        saved = TaskRepository.save(task)
+        cls._notify_assignment(saved)
+        return saved
 
     @classmethod
     def update(cls, task_id, payload):
         task = cls.get(task_id)
+        previous_user_id = task.user_id
 
         if 'title' in payload:
             cls._validate_title(payload['title'])
@@ -161,7 +207,9 @@ class TaskService:
         if 'tags' in payload:
             task.set_tags(payload['tags'])
 
-        return TaskRepository.save(task)
+        saved = TaskRepository.save(task)
+        cls._notify_assignment(saved, previous_user_id)
+        return saved
 
     @classmethod
     def delete(cls, task_id):
@@ -180,7 +228,7 @@ class TaskService:
         counts = TaskRepository.count_by_status()
         total = sum(counts.values())
         done = counts.get('done', 0)
-        overdue = len(TaskRepository.list_overdue())
+        overdue = TaskRepository.count_overdue()
         return {
             'total': total,
             'pending': counts.get('pending', 0),

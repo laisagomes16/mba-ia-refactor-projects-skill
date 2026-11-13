@@ -52,6 +52,7 @@ async function bootstrap() {
     });
     const financialReportService = createFinancialReportService({ reportRepository });
     const userService = createUserService({
+        db,
         userRepository,
         enrollmentRepository,
         paymentRepository

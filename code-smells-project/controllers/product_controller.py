@@ -1,6 +1,6 @@
 from flask import jsonify, request
 
-from auth import require_auth
+from auth import require_admin
 from controllers.pagination import parse_pagination
 from errors import AppError
 from services.product_service import ProductService
@@ -20,21 +20,21 @@ def buscar_produto(id):
     return jsonify({"dados": produto, "sucesso": True}), 200
 
 
-@require_auth
+@require_admin
 def criar_produto():
     dados = request.get_json()
     product_id = _service.criar(dados)
     return jsonify({"dados": {"id": product_id}, "sucesso": True, "mensagem": "Produto criado"}), 201
 
 
-@require_auth
+@require_admin
 def atualizar_produto(id):
     dados = request.get_json()
     _service.atualizar(id, dados)
     return jsonify({"sucesso": True, "mensagem": "Produto atualizado"}), 200
 
 
-@require_auth
+@require_admin
 def deletar_produto(id):
     _service.deletar(id)
     return jsonify({"sucesso": True, "mensagem": "Produto deletado"}), 200

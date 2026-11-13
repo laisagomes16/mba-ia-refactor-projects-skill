@@ -310,9 +310,18 @@ desafio-skills/
 │   │       └── refactor-arch/             # ← CÓPIA DA SKILL
 │   │           └── ...
 │   ├── src/
-│   │   ├── app.js
-│   │   ├── AppManager.js
-│   │   └── utils.js
+│   │   ├── app.js                         # composition root
+│   │   ├── config.js
+│   │   ├── routes/
+│   │   ├── controllers/
+│   │   ├── services/
+│   │   ├── repositories/
+│   │   ├── adapters/
+│   │   ├── middleware/
+│   │   ├── validators/
+│   │   ├── db/
+│   │   └── errors/
+│   ├── test/
 │   ├── api.http
 │   └── package.json
 │

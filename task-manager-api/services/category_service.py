@@ -19,8 +19,17 @@ class CategoryService:
         return category
 
     @staticmethod
-    def list_all():
-        return CategoryRepository.list_all_with_tasks()
+    def list_all(pagination=None):
+        if pagination is None:
+            return CategoryRepository.list_all_with_tasks()
+        return CategoryRepository.list_all_with_tasks(limit=pagination['per_page'],
+                                                      offset=pagination['offset'])
+
+    @staticmethod
+    def count(pagination):
+        if pagination is None:
+            return None
+        return CategoryRepository.count_all()
 
     @staticmethod
     def _validate_name(name):

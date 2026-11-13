@@ -1,3 +1,5 @@
+const MIN_SEED_PASSWORD_LENGTH = 8;
+
 function required(name) {
     const value = process.env[name];
     if (!value) {
@@ -6,16 +8,23 @@ function required(name) {
     return value;
 }
 
+function requiredSeedUserPassword() {
+    const value = required('SEED_USER_PASSWORD');
+    if (value.length < MIN_SEED_PASSWORD_LENGTH) {
+        throw new Error(
+            `Environment variable SEED_USER_PASSWORD must have at least ${MIN_SEED_PASSWORD_LENGTH} characters`
+        );
+    }
+    return value;
+}
+
 function loadConfig() {
     return {
-        dbUser: required('DB_USER'),
-        dbPass: required('DB_PASS'),
         paymentGatewayKey: required('PAYMENT_GATEWAY_KEY'),
-        smtpUser: process.env.SMTP_USER || '',
         adminApiKey: required('ADMIN_API_KEY'),
-        port: Number(process.env.PORT || 3000),
-        seedUserPassword: process.env.SEED_USER_PASSWORD || '123'
+        seedUserPassword: requiredSeedUserPassword(),
+        port: Number(process.env.PORT || 3000)
     };
 }
 
-module.exports = { loadConfig };
+module.exports = { loadConfig, MIN_SEED_PASSWORD_LENGTH };

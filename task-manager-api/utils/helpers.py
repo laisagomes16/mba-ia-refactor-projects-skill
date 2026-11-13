@@ -5,6 +5,8 @@ Substitui o antigo `utils/helpers.py`, que acumulava funções duplicadas e órf
 """
 from datetime import datetime, timedelta, timezone
 
+from errors import ValidationError
+
 # Status de task (antes repetidos como literais em 5 arquivos).
 STATUS_PENDING = 'pending'
 STATUS_IN_PROGRESS = 'in_progress'
@@ -84,4 +86,55 @@ def calculate_percentage(part, total):
 
 def recent_activity_cutoff():
     return to_naive_utc(utcnow() - timedelta(days=RECENT_ACTIVITY_WINDOW_DAYS))
+
+
+# ----- paginação (FINDING-015) -----
+# Opcional e aditiva: sem `page`/`per_page` na query a resposta continua sendo
+# uma lista, preservando o contrato dos 22 endpoints originais.
+DEFAULT_PAGE = 1
+DEFAULT_PER_PAGE = 20
+MAX_PER_PAGE = 100
+
+MSG_INVALID_PAGE = 'Parâmetro "page" deve ser um inteiro maior que zero'
+MSG_INVALID_PER_PAGE = 'Parâmetro "per_page" deve ser um inteiro entre 1 e {}'.format(MAX_PER_PAGE)
+
+
+def _positive_int(raw, message):
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        raise ValidationError(message)
+    if value < 1:
+        raise ValidationError(message)
+    return value
+
+
+def parse_pagination(args):
+    """Lê `page`/`per_page` da query string.
+
+    Retorna `None` quando o cliente não pediu paginação (resposta = lista) ou
+    `{'page', 'per_page', 'offset'}` quando pediu (resposta = envelope).
+    """
+    if 'page' not in args and 'per_page' not in args:
+        return None
+
+    page = (_positive_int(args.get('page'), MSG_INVALID_PAGE)
+            if args.get('page') is not None else DEFAULT_PAGE)
+    per_page = (_positive_int(args.get('per_page'), MSG_INVALID_PER_PAGE)
+                if args.get('per_page') is not None else DEFAULT_PER_PAGE)
+    if per_page > MAX_PER_PAGE:
+        raise ValidationError(MSG_INVALID_PER_PAGE)
+    return {'page': page, 'per_page': per_page, 'offset': (page - 1) * per_page}
+
+
+def paginated(items, total, pagination):
+    """Envelope de paginação devolvido apenas quando `pagination` não é None."""
+    pages = (total + pagination['per_page'] - 1) // pagination['per_page']
+    return {
+        'items': items,
+        'page': pagination['page'],
+        'per_page': pagination['per_page'],
+        'total': total,
+        'pages': pages,
+    }
 

@@ -21,7 +21,8 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     DEBUG = _env_bool("FLASK_DEBUG", False)
-    HOST = os.environ.get("TASK_MANAGER_HOST", "0.0.0.0")
+    # Default restrito ao loopback (FINDING-020); exponha na rede só de propósito.
+    HOST = os.environ.get("TASK_MANAGER_HOST", "127.0.0.1")
     PORT = int(os.environ.get("TASK_MANAGER_PORT", "5000"))
 
     # SMTP: sem credenciais no código.

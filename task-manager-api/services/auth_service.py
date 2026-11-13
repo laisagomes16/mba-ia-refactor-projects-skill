@@ -63,11 +63,16 @@ class AuthService:
     def user_from_payload(payload):
         """Resolve o `User` a partir do `sub` de um payload já validado.
 
+        Usa `session.get` (identity map) em vez de um `SELECT` por id: se o
+        usuário já estiver carregado na requisição, nenhuma query extra é feita.
+
         Import local evita ciclo (`repositories` → `models` → `utils`).
         """
-        from repositories.user_repository import UserRepository
+        from database import db
+        from models.user import User
 
         subject = (payload or {}).get('sub')
         if subject is None:
             return None
-        return UserRepository.get_by_id(subject)
+        return db.session.get(User, subject)
+

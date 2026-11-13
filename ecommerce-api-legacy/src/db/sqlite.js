@@ -31,6 +31,38 @@ function all(db, sql, params = []) {
     });
 }
 
+/**
+ * Runs `fn` inside BEGIN/COMMIT, rolling back if it throws.
+ * The callback executes in the same serialize queue, so no other query on this
+ * connection can interleave between the statements of the transaction.
+ */
+function transaction(db, fn) {
+    return serialize(db, async () => {
+        await run(db, 'BEGIN');
+
+        let result;
+        try {
+            result = await fn();
+        } catch (err) {
+            try {
+                await run(db, 'ROLLBACK');
+            } catch {
+                // Rollback failure must not hide the original error.
+            }
+            throw err;
+        }
+
+        try {
+            await run(db, 'COMMIT');
+        } catch (err) {
+            await run(db, 'ROLLBACK').catch(() => {});
+            throw err;
+        }
+
+        return result;
+    });
+}
+
 function serialize(db, fn) {
     return new Promise((resolve, reject) => {
         db.serialize(() => {
@@ -42,4 +74,4 @@ function serialize(db, fn) {
     });
 }
 
-module.exports = { openDatabase, run, get, all, serialize };
+module.exports = { openDatabase, run, get, all, serialize, transaction };

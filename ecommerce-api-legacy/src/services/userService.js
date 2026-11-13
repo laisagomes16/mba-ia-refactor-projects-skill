@@ -1,6 +1,8 @@
 const { AppError } = require('../errors/AppError');
+const { transaction } = require('../db/sqlite');
 
 function createUserService({
+    db,
     userRepository,
     enrollmentRepository,
     paymentRepository
@@ -12,13 +14,15 @@ function createUserService({
                 throw new AppError(404, 'Usuário não encontrado');
             }
 
-            const enrollments = await enrollmentRepository.listByUserId(id);
-            const enrollmentIds = enrollments.map((e) => e.id);
-
             try {
-                await paymentRepository.deleteByEnrollmentIds(enrollmentIds);
-                await enrollmentRepository.deleteByUserId(id);
-                await userRepository.deleteById(id);
+                await transaction(db, async () => {
+                    const enrollments = await enrollmentRepository.listByUserId(id);
+                    const enrollmentIds = enrollments.map((e) => e.id);
+
+                    await paymentRepository.deleteByEnrollmentIds(enrollmentIds);
+                    await enrollmentRepository.deleteByUserId(id);
+                    await userRepository.deleteById(id);
+                });
             } catch {
                 throw new AppError(500, 'Erro DB');
             }
